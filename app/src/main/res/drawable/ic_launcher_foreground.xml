@@ -1,0 +1,22 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- trawka -->
+    <path android:fillColor="#7CB342" android:pathData="M24,82 Q54,72 84,82 L84,88 L24,88 Z" />
+    <!-- pień -->
+    <path android:fillColor="#6D4C41" android:pathData="M50,70 L58,70 L58,84 L50,84 Z" />
+    <!-- choinka -->
+    <path android:fillColor="#558B2F" android:pathData="M54,42 L78,74 L30,74 Z" />
+    <path android:fillColor="#7CB342" android:pathData="M54,33 L72,58 L36,58 Z" />
+    <path android:fillColor="#9CCC65" android:pathData="M54,25 L66,44 L42,44 Z" />
+    <!-- gwiazdka -->
+    <path android:fillColor="#F2B705" android:pathData="M54,17 L56.4,22.2 L62,22.6 L57.7,26.2 L59,31.6 L54,28.6 L49,31.6 L50.3,26.2 L46,22.6 L51.6,22.2 Z" />
+    <!-- żołądź -->
+    <path android:fillColor="#A1683A" android:pathData="M70,74 a5,6 0 1,0 10,0 L80,72 L70,72 Z" />
+    <path android:fillColor="#6D4C41" android:pathData="M69,72 Q75,66 81,72 Z" />
+    <!-- muchomorek -->
+    <path android:fillColor="#FFF3E0" android:pathData="M33,76 L37,76 L37,84 L33,84 Z" />
+    <path android:fillColor="#D84343" android:pathData="M28,77 Q35,66 42,77 Z" />
+</vector>

@@ -1,0 +1,7 @@
+<resources>
+    <color name="forest_bg">#FFD7EBC0</color>
+    <color name="forest_icon_bg">#FF2E6B3A</color>
+    <style name="Theme.LesnePunkty" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/forest_bg</item>
+    </style>
+</resources>
