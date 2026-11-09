@@ -1,0 +1,12 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "families": {
+      "$code": {
+        ".read": "$code.length === 10",
+        ".write": "$code.length === 10"
+      }
+    }
+  }
+}

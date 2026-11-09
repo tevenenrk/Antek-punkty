@@ -16,13 +16,25 @@ import pl.antek.punkty.data.PointEvent
 import pl.antek.punkty.logic.Levels
 import pl.antek.punkty.logic.signed
 import pl.antek.punkty.ui.AppViewModel
+import pl.antek.punkty.ui.SyncUi
+import pl.antek.punkty.sync.FamilyCode
+import android.content.Intent
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import pl.antek.punkty.ui.components.*
 import pl.antek.punkty.ui.theme.Forest
 
 private enum class Danger { PROGRESS, ALL }
 
 @Composable
-fun MoreScreen(data: AppData, vm: AppViewModel, isParent: Boolean, requireParent: (() -> Unit) -> Unit) {
+fun MoreScreen(data: AppData, vm: AppViewModel, isParent: Boolean, syncUi: SyncUi, requireParent: (() -> Unit) -> Unit) {
     var nameDialog by remember { mutableStateOf(false) }
     var pinDialog by remember { mutableStateOf(false) }
     var manualDialog by remember { mutableStateOf(false) }
@@ -53,6 +65,7 @@ fun MoreScreen(data: AppData, vm: AppViewModel, isParent: Boolean, requireParent
                 SettingRow("🎁", "Punkty ręcznie", "Bonus albo korekta", "Dodaj") { requireParent { manualDialog = true } }
             }
         }
+        item { SyncCard(syncUi, vm, requireParent) }
         item {
             ParchmentCard(Modifier.fillMaxWidth()) {
                 SectionTitle("🌳 Poziomy w lesie")
@@ -215,4 +228,145 @@ private fun ManualPointsDialog(onDismiss: () -> Unit, onConfirm: (Int, String) -
         confirmButton = { Button(onClick = { onConfirm(points, note) }) { Text(signed(points)) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Anuluj") } },
     )
+}
+
+@Composable
+private fun SyncCard(sync: SyncUi, vm: AppViewModel, requireParent: (() -> Unit) -> Unit) {
+    var joinDialog by remember { mutableStateOf(false) }
+    var confirmCreate by remember { mutableStateOf(false) }
+    var confirmLeave by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    ParchmentCard(Modifier.fillMaxWidth()) {
+        SectionTitle("📱 Wspólne punkty")
+        Spacer(Modifier.height(4.dp))
+        when {
+            !sync.available -> Text(
+                "Ta wersja aplikacji nie ma jeszcze połączenia z chmurą (brak konfiguracji Firebase). " +
+                    "Po jej dodaniu dwa telefony będą mogły dzielić punkty za pomocą kodu rodziny.",
+                color = Forest.BarkDark,
+            )
+
+            sync.code == null -> {
+                Text(
+                    "Połącz telefony rodziców kodem rodziny – wszystkie będą miały te same punkty, nagrody i odznaki. " +
+                        "Bez zakładania kont.",
+                    color = Forest.BarkDark,
+                )
+                Spacer(Modifier.height(10.dp))
+                Button(
+                    onClick = { requireParent { confirmCreate = true } },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Forest.Moss),
+                ) { Text("🌱 Utwórz kod rodziny (pierwszy telefon)") }
+                OutlinedButton(
+                    onClick = { requireParent { joinDialog = true } },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !sync.busy,
+                ) { Text(if (sync.busy) "Łączenie…" else "🔑 Mam kod – dołącz (drugi telefon)") }
+            }
+
+            else -> {
+                Text("Kod rodziny – wpisz go na drugim telefonie:", color = Forest.BarkDark)
+                Spacer(Modifier.height(8.dp))
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color.White,
+                    border = BorderStroke(2.dp, Forest.Gold),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        FamilyCode.pretty(sync.code),
+                        Modifier.padding(vertical = 14.dp),
+                        textAlign = TextAlign.Center,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 28.sp,
+                        letterSpacing = 2.sp,
+                        color = Forest.Deep,
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(if (sync.online) Forest.Leaf else Color(0xFFBDBDBD)),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        if (sync.online) "Połączono – zmiany od razu trafiają na inne telefony"
+                        else "Brak internetu – zmiany wyślą się, gdy wróci połączenie",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Forest.BarkDark,
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilledTonalButton(onClick = {
+                        val text = "Kod rodziny do aplikacji Leśne Punkty: ${FamilyCode.pretty(sync.code)}"
+                        val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
+                        context.startActivity(Intent.createChooser(send, "Wyślij kod rodziny"))
+                    }) { Text("📤 Wyślij kod") }
+                    TextButton(onClick = { requireParent { confirmLeave = true } }) { Text("Odłącz ten telefon") }
+                }
+            }
+        }
+        sync.error?.let { err ->
+            Spacer(Modifier.height(8.dp))
+            Surface(shape = RoundedCornerShape(12.dp), color = Forest.MushroomTint, onClick = { vm.clearSyncError() }) {
+                Text("⚠️ $err", Modifier.padding(10.dp), color = Forest.Mushroom)
+            }
+        }
+    }
+
+    if (confirmCreate) {
+        ConfirmDialog(
+            title = "Utworzyć kod rodziny?",
+            text = "Punkty, nagrody i odznaki z tego telefonu trafią do chmury. Na drugim telefonie wybierz „Mam kod – dołącz”.",
+            confirmLabel = "Utwórz",
+            icon = "🌱",
+            onConfirm = { confirmCreate = false; vm.createFamily() },
+            onDismiss = { confirmCreate = false },
+        )
+    }
+    if (confirmLeave) {
+        ConfirmDialog(
+            title = "Odłączyć ten telefon?",
+            text = "Telefon zachowa obecne dane, ale przestanie je wymieniać z innymi. Możesz później dołączyć ponownie tym samym kodem.",
+            confirmLabel = "Odłącz",
+            onConfirm = { confirmLeave = false; vm.leaveFamily() },
+            onDismiss = { confirmLeave = false },
+        )
+    }
+    if (joinDialog) {
+        var code by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { joinDialog = false },
+            containerColor = Forest.Parchment,
+            icon = { Text("🔑", fontSize = 36.sp) },
+            title = { Text("Dołącz do rodziny") },
+            text = {
+                Column {
+                    Text("Wpisz kod z pierwszego telefonu. Dane na TYM telefonie zostaną zastąpione danymi rodziny.")
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = code,
+                        onValueChange = { code = it.uppercase().take(14) },
+                        label = { Text("Kod, np. ABCDE-FGH23") },
+                        singleLine = true,
+                        textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace, fontSize = 20.sp),
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { joinDialog = false; vm.joinFamily(code) },
+                    enabled = FamilyCode.normalize(code) != null,
+                ) { Text("Dołącz") }
+            },
+            dismissButton = { TextButton(onClick = { joinDialog = false }) { Text("Anuluj") } },
+        )
+    }
 }

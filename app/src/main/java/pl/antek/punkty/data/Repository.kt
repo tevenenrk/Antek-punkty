@@ -1,11 +1,9 @@
 package pl.antek.punkty.data
 
-import android.content.Context
 import kotlinx.serialization.json.Json
 import java.io.File
 
-class Repository(context: Context) {
-    private val dir = context.filesDir
+class Repository(private val dir: File) {
     private val file = File(dir, "data.json")
     private val json = Json {
         ignoreUnknownKeys = true

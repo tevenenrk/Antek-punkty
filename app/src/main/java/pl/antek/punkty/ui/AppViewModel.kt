@@ -1,6 +1,8 @@
 package pl.antek.punkty.ui
 
 import android.app.Application
+import android.content.Context
+import android.content.SharedPreferences
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
@@ -29,6 +31,12 @@ import pl.antek.punkty.data.newId
 import pl.antek.punkty.logic.BadgeEngine
 import pl.antek.punkty.logic.Level
 import pl.antek.punkty.logic.Levels
+import pl.antek.punkty.sync.FamilyCode
+import pl.antek.punkty.sync.FamilySync
+import pl.antek.punkty.sync.SyncBackend
+import pl.antek.punkty.sync.FirebaseProvider
+import pl.antek.punkty.sync.SyncCodec
+import pl.antek.punkty.sync.normalized
 
 sealed interface Celebration {
     data class BadgeEarned(val badge: Badge) : Celebration
@@ -36,8 +44,31 @@ sealed interface Celebration {
     data class RewardRedeemed(val reward: Reward) : Celebration
 }
 
-class AppViewModel(app: Application) : AndroidViewModel(app) {
-    private val repo = Repository(app)
+/** Stan synchronizacji widoczny w UI. */
+data class SyncUi(
+    val available: Boolean,
+    val code: String? = null,
+    val online: Boolean = false,
+    val busy: Boolean = false,
+    val error: String? = null,
+)
+
+class AppDeps(val repo: Repository, val prefs: SharedPreferences, val sync: SyncBackend?) {
+    companion object {
+        fun default(app: Application) = AppDeps(
+            Repository(app.filesDir),
+            app.getSharedPreferences("sync", Context.MODE_PRIVATE),
+            FirebaseProvider.database(app)?.let { FamilySync(it) },
+        )
+    }
+}
+
+class AppViewModel(app: Application, deps: AppDeps) : AndroidViewModel(app) {
+    constructor(app: Application) : this(app, AppDeps.default(app))
+
+    private val repo = deps.repo
+    private val prefs = deps.prefs
+    private val sync: SyncBackend? = deps.sync
     private val _data = MutableStateFlow(repo.load())
     val data: StateFlow<AppData> = _data.asStateFlow()
 
@@ -50,8 +81,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private val saveMutex = Mutex()
 
+    private val _sync = MutableStateFlow(SyncUi(available = sync != null))
+    val syncState: StateFlow<SyncUi> = _sync.asStateFlow()
+    private val familyCode: String? get() = _sync.value.code
+
     init {
         refresh()
+        sync?.watchConnection { online -> _sync.value = _sync.value.copy(online = online) }
+        prefs.getString(KEY_CODE, null)?.let { code ->
+            if (sync != null) startListening(code)
+        }
+    }
+
+    override fun onCleared() {
+        sync?.close()
     }
 
     /** Ponowne sprawdzenie odznak (np. „bez wpadki” zależy od upływu dni). */
@@ -61,6 +104,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val before = _data.value
         val after = awardBadges(transform(before))
         if (after == before) return
+        commit(before, after)
+        if (familyCode != null) sync?.push(SyncCodec.diff(before, after))
+    }
+
+    private fun commit(before: AppData, after: AppData) {
         _data.value = after
         val lb = Levels.forXp(before.xp)
         val la = Levels.forXp(after.xp)
@@ -68,12 +116,90 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         persist()
     }
 
+    /** Zmiana przyszła z innego telefonu. */
+    private fun applyRemote(remote: AppData) {
+        val before = _data.value
+        if (remote == before.normalized()) return
+        val known = before.earned.map { it.badgeId }.toSet()
+        remote.earned.filter { it.badgeId !in known }.forEach { e ->
+            remote.badges.find { it.id == e.badgeId }?.let { _celebrations.trySend(Celebration.BadgeEarned(it)) }
+        }
+        val after = awardBadges(remote)
+        commit(before, after)
+        if (after != remote) sync?.push(SyncCodec.diff(remote, after))
+    }
+
+    // --- wspólne punkty na kilku telefonach ---
+
+    private fun startListening(code: String) {
+        val s = sync ?: return
+        _sync.value = _sync.value.copy(code = code, error = null)
+        s.start(code, onData = ::applyRemote, onError = { msg ->
+            _sync.value = _sync.value.copy(error = "Synchronizacja przerwana: $msg")
+        })
+    }
+
+    private fun saveCode(code: String?) {
+        prefs.edit().apply { if (code == null) remove(KEY_CODE) else putString(KEY_CODE, code) }.apply()
+    }
+
+    /** Ten telefon zakłada rodzinę i wysyła do niej swoje dane. */
+    fun createFamily() {
+        val s = sync ?: return
+        val code = FamilyCode.generate()
+        s.create(code, _data.value.normalized()) { msg ->
+            _sync.value = _sync.value.copy(error = "Nie udało się utworzyć kodu: $msg")
+        }
+        saveCode(code)
+        startListening(code)
+    }
+
+    /** Ten telefon dołącza do rodziny – jego dane zostają zastąpione danymi z chmury. */
+    fun joinFamily(input: String) {
+        val s = sync ?: return
+        val code = FamilyCode.normalize(input)
+        if (code == null) {
+            _sync.value = _sync.value.copy(error = "Kod powinien mieć ${FamilyCode.LENGTH} znaków, np. ABCDE-FGH23")
+            return
+        }
+        _sync.value = _sync.value.copy(busy = true, error = null)
+        s.fetch(
+            code,
+            onResult = { remote ->
+                if (remote == null) {
+                    _sync.value = _sync.value.copy(busy = false, error = "Nie znaleziono rodziny o kodzie ${FamilyCode.pretty(code)}")
+                } else {
+                    _data.value = remote
+                    persist()
+                    saveCode(code)
+                    _sync.value = _sync.value.copy(busy = false)
+                    startListening(code)
+                }
+            },
+            onError = { msg ->
+                _sync.value = _sync.value.copy(busy = false, error = "Brak połączenia z internetem ($msg)")
+            },
+        )
+    }
+
+    /** Odłącza ten telefon. Dane zostają na telefonie jako osobna kopia. */
+    fun leaveFamily() {
+        sync?.stop()
+        saveCode(null)
+        _sync.value = _sync.value.copy(code = null, error = null)
+    }
+
+    fun clearSyncError() {
+        _sync.value = _sync.value.copy(error = null)
+    }
+
     private fun awardBadges(data: AppData): AppData {
         val newly = BadgeEngine.newlyEarned(data)
         if (newly.isEmpty()) return data
         val now = System.currentTimeMillis()
         val bonus = newly.filter { it.bonus > 0 }.map {
-            PointEvent(newId(), now, EventKind.BADGE, it.id, "Odznaka: ${it.name}", it.icon, it.bonus)
+            // Stałe id: gdy dwa telefony jednocześnie przyznają tę samą odznakę, bonus nie zdubluje się.
+            PointEvent("badge-${it.id}", now, EventKind.BADGE, it.id, "Odznaka: ${it.name}", it.icon, it.bonus)
         }
         newly.forEach { _celebrations.trySend(Celebration.BadgeEarned(it)) }
         return data.copy(
@@ -166,6 +292,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun resetAll() = update { d -> Defaults.create().copy(pin = d.pin, childName = d.childName) }
 }
+
+private const val KEY_CODE = "family_code"
 
 fun <T> List<T>.upsert(item: T, key: (T) -> Any): List<T> {
     val k = key(item)

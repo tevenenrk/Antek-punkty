@@ -77,6 +77,8 @@ class ScreenshotTest {
         shot("3_nagrody")
         rule.onNodeWithText("Odznaki").performClick(); rule.mainClock.advanceTimeBy(1500)
         shot("4_odznaki")
+        rule.onNodeWithText("Więcej").performClick(); rule.mainClock.advanceTimeBy(1500)
+        shot("5_wiecej")
     }
 
     @Test

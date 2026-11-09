@@ -19,8 +19,21 @@ Aplikacja na Androida w klimacie bajkowego lasu. Dziecko zbiera punkty (🌰 żo
   - 🛡️ **Bez wpadki** – N dni z rzędu bez wybranych złych zachowań.
 
   Za odznakę można ustawić bonusowe punkty.
+- **Wspólne punkty na kilku telefonach** – bez kont: pierwszy telefon tworzy *kod rodziny* (np. `K7QM2-XP4RA`), drugi go wpisuje i od tej pory punkty, nagrody, odznaki i ustawienia synchronizują się przez internet. Bez internetu wszystko działa dalej, a zmiany wysyłają się po odzyskaniu połączenia.
 - **PIN rodzica** (opcjonalny) – blokuje przyznawanie punktów, odbieranie nagród i edycję. Aplikacja sama blokuje się po wyjściu z niej.
 - Wszystkie dane są zapisywane lokalnie na telefonie (`data.json`, objęte kopią zapasową Androida).
+
+## Włączenie wspólnych punktów (Firebase, jednorazowo, za darmo)
+
+Synchronizacja używa darmowego planu Firebase Realtime Database. Bez konfiguracji aplikacja działa normalnie, tylko bez tej funkcji.
+
+1. Wejdź na https://console.firebase.google.com → **Dodaj projekt** (np. „lesne-punkty”). Google Analytics możesz wyłączyć.
+2. **Build → Realtime Database → Utwórz bazę danych**. Wybierz lokalizację (np. `europe-west1`) i **tryb zablokowany**.
+3. W zakładce **Reguły** wklej zawartość pliku [`database.rules.json`](database.rules.json) i kliknij **Opublikuj**. Reguły pozwalają czytać i zapisywać tylko pod konkretnym 10-znakowym kodem rodziny, a listowanie wszystkich rodzin jest zablokowane.
+4. **Ustawienia projektu (⚙️) → Twoje aplikacje → Android**. Nazwa pakietu: `pl.antek.punkty`. Pobierz plik **`google-services.json`**.
+5. Umieść plik w `app/google-services.json` i zbuduj aplikację. W GitHub Actions możesz zamiast tego dodać sekret repozytorium `GOOGLE_SERVICES_JSON` z zawartością pliku.
+
+Kod rodziny pełni rolę hasła: kto go zna, widzi punkty rodziny. Ma 10 losowych znaków (ok. 10^15 kombinacji), więc nie da się go zgadnąć.
 
 ## Budowanie
 

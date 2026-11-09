@@ -44,6 +44,7 @@ enum class AppTab(val label: String, val emoji: String) {
 fun ForestApp(vm: AppViewModel = viewModel()) {
     val data by vm.data.collectAsStateWithLifecycle()
     val isParent by vm.isParent.collectAsStateWithLifecycle()
+    val syncUi by vm.syncState.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableStateOf(AppTab.HOME) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -74,7 +75,7 @@ fun ForestApp(vm: AppViewModel = viewModel()) {
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
-                TopBar(data, isParent) {
+                TopBar(data, isParent, syncUi) {
                     if (isParent) vm.lock() else pendingAction = {}
                 }
             },
@@ -113,7 +114,7 @@ fun ForestApp(vm: AppViewModel = viewModel()) {
                     AppTab.BEHAVIORS -> BehaviorsScreen(data, vm, requireParent, onLogged)
                     AppTab.REWARDS -> RewardsScreen(data, vm, requireParent)
                     AppTab.BADGES -> BadgesScreen(data, vm, requireParent)
-                    AppTab.MORE -> MoreScreen(data, vm, isParent, requireParent)
+                    AppTab.MORE -> MoreScreen(data, vm, isParent, syncUi, requireParent)
                 }
             }
         }
@@ -140,7 +141,7 @@ fun ForestApp(vm: AppViewModel = viewModel()) {
 }
 
 @Composable
-private fun TopBar(data: AppData, isParent: Boolean, onLockClick: () -> Unit) {
+private fun TopBar(data: AppData, isParent: Boolean, syncUi: SyncUi, onLockClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -152,7 +153,12 @@ private fun TopBar(data: AppData, isParent: Boolean, onLockClick: () -> Unit) {
         Spacer(Modifier.width(8.dp))
         Column(Modifier.weight(1f)) {
             Text("Leśne Punkty", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = Forest.Deep)
-            Text("Przygoda: ${data.childName}", style = MaterialTheme.typography.labelMedium, color = Forest.Bark)
+            val cloud = when {
+                syncUi.code == null -> ""
+                syncUi.online -> " · ☁️ wspólne"
+                else -> " · ☁️ offline"
+            }
+            Text("Przygoda: ${data.childName}$cloud", style = MaterialTheme.typography.labelMedium, color = Forest.Bark)
         }
         PointsPill(data.balance)
         if (!data.pin.isNullOrEmpty()) {
