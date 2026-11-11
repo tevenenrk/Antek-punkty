@@ -24,6 +24,7 @@ import pl.antek.punkty.data.Behavior
 import pl.antek.punkty.data.Defaults
 import pl.antek.punkty.data.EarnedBadge
 import pl.antek.punkty.data.EventKind
+import pl.antek.punkty.data.Mission
 import pl.antek.punkty.data.PointEvent
 import pl.antek.punkty.data.Repository
 import pl.antek.punkty.data.Reward
@@ -42,6 +43,7 @@ sealed interface Celebration {
     data class BadgeEarned(val badge: Badge) : Celebration
     data class LevelUp(val level: Level) : Celebration
     data class RewardRedeemed(val reward: Reward) : Celebration
+    data class MissionDone(val mission: Mission) : Celebration
 }
 
 /** Stan synchronizacji widoczny w UI. */
@@ -102,7 +104,7 @@ class AppViewModel(app: Application, deps: AppDeps) : AndroidViewModel(app) {
 
     private fun update(transform: (AppData) -> AppData) {
         val before = _data.value
-        val after = awardBadges(transform(before))
+        val after = awardBadges(completeMissions(transform(before)))
         if (after == before) return
         commit(before, after)
         if (familyCode != null) sync?.push(SyncCodec.diff(before, after))
@@ -124,7 +126,11 @@ class AppViewModel(app: Application, deps: AppDeps) : AndroidViewModel(app) {
         remote.earned.filter { it.badgeId !in known }.forEach { e ->
             remote.badges.find { it.id == e.badgeId }?.let { _celebrations.trySend(Celebration.BadgeEarned(it)) }
         }
-        val after = awardBadges(remote)
+        val doneBefore = before.missions.filter { it.completedAt != null }.map { it.id }.toSet()
+        remote.missions.filter { it.completedAt != null && it.id !in doneBefore }.forEach {
+            _celebrations.trySend(Celebration.MissionDone(it))
+        }
+        val after = awardBadges(completeMissions(remote))
         commit(before, after)
         if (after != remote) sync?.push(SyncCodec.diff(remote, after))
     }
@@ -208,6 +214,23 @@ class AppViewModel(app: Application, deps: AppDeps) : AndroidViewModel(app) {
         )
     }
 
+    /** Misja z odhaczonymi wszystkimi podpunktami zostaje zakończona i daje nagrodę. */
+    private fun completeMissions(data: AppData): AppData {
+        val ready = data.missions.filter { m -> m.completedAt == null && m.steps.isNotEmpty() && m.steps.all { it.done } }
+        if (ready.isEmpty()) return data
+        val now = System.currentTimeMillis()
+        val ids = ready.map { it.id }.toSet()
+        // Stałe id: misja ukończona równocześnie na dwóch telefonach da nagrodę tylko raz.
+        val bonus = ready.filter { it.reward > 0 && data.events.none { e -> e.id == "mission-${it.id}" } }.map {
+            PointEvent("mission-${it.id}", now, EventKind.MISSION, it.id, "Misja: ${it.title}", it.icon, it.reward)
+        }
+        ready.forEach { _celebrations.trySend(Celebration.MissionDone(it)) }
+        return data.copy(
+            missions = data.missions.map { if (it.id in ids) it.copy(completedAt = now) else it },
+            events = data.events + bonus,
+        )
+    }
+
     private fun persist() {
         viewModelScope.launch(Dispatchers.IO) {
             saveMutex.withLock { repo.save(_data.value) }
@@ -261,6 +284,18 @@ class AppViewModel(app: Application, deps: AppDeps) : AndroidViewModel(app) {
         d.copy(badges = d.badges.filterNot { it.id == id }, earned = d.earned.filterNot { it.badgeId == id })
     }
 
+    fun saveMission(m: Mission) = update { d -> d.copy(missions = d.missions.upsert(m) { it.id }) }
+    fun deleteMission(id: String) = update { d -> d.copy(missions = d.missions.filterNot { it.id == id }) }
+
+    fun toggleStep(missionId: String, stepId: String) = update { d ->
+        d.copy(
+            missions = d.missions.map { m ->
+                if (m.id != missionId || m.completedAt != null) m
+                else m.copy(steps = m.steps.map { if (it.id == stepId) it.copy(done = !it.done) else it })
+            },
+        )
+    }
+
     fun setChildName(name: String) = update { it.copy(childName = name.trim().ifBlank { "Antek" }) }
 
     fun setPin(pin: String?) {
@@ -284,6 +319,7 @@ class AppViewModel(app: Application, deps: AppDeps) : AndroidViewModel(app) {
             d.copy(
                 events = emptyList(),
                 earned = emptyList(),
+                missions = d.missions.map { m -> m.copy(completedAt = null, steps = m.steps.map { it.copy(done = false) }) },
                 createdAt = now,
                 badges = d.badges.map { it.copy(createdAt = now) },
             )

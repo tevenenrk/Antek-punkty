@@ -57,8 +57,25 @@ object Defaults {
                 target = 20, bonus = 20, createdAt = now,
             ),
         )
+        val missions = listOf(
+            Mission(
+                id = "m_room",
+                title = "Operacja Czysty Pokój",
+                icon = "🧹",
+                description = "Tajna misja: przywrócić porządek w bazie!",
+                steps = listOf(
+                    MissionStep("m_room_1", "Zbierz klocki do pudełka"),
+                    MissionStep("m_room_2", "Odłóż książki na półkę"),
+                    MissionStep("m_room_3", "Wrzuć brudne ubrania do kosza"),
+                    MissionStep("m_room_4", "Pościel łóżko"),
+                ),
+                reward = 15,
+                createdAt = now,
+            ),
+        )
         return AppData(
             childName = "Antek",
+            missions = missions,
             behaviors = behaviors,
             rewards = rewards,
             badges = badges,

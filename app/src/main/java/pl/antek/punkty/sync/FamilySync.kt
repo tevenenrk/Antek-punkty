@@ -103,5 +103,6 @@ class FamilySync(private val db: FirebaseDatabase) : SyncBackend {
         configJson = s.child("config").getValue(String::class.java),
         events = s.child("events").children.mapNotNull { it.getValue(String::class.java) },
         earned = s.child("earned").children.mapNotNull { c -> c.getValue(Long::class.java)?.let { c.key!! to it } }.toMap(),
+        missions = s.child("missions").children.mapNotNull { it.getValue(String::class.java) },
     )
 }

@@ -60,7 +60,7 @@ data class Badge(
 )
 
 @Serializable
-enum class EventKind { BEHAVIOR, REWARD, BADGE, MANUAL }
+enum class EventKind { BEHAVIOR, REWARD, BADGE, MANUAL, MISSION }
 
 @Serializable
 data class PointEvent(
@@ -72,6 +72,28 @@ data class PointEvent(
     val icon: String,
     val points: Int,
 )
+
+@Serializable
+data class MissionStep(
+    val id: String,
+    val text: String,
+    val done: Boolean = false,
+)
+
+/** Jednorazowa misja z podpunktami. Po odhaczeniu wszystkich dziecko dostaje [reward] punktów. */
+@Serializable
+data class Mission(
+    val id: String,
+    val title: String,
+    val icon: String = "🗺️",
+    val description: String = "",
+    val steps: List<MissionStep> = emptyList(),
+    val reward: Int = 10,
+    val createdAt: Long = System.currentTimeMillis(),
+    val completedAt: Long? = null,
+) {
+    val doneCount: Int get() = steps.count { it.done }
+}
 
 @Serializable
 data class EarnedBadge(
@@ -88,6 +110,7 @@ data class AppData(
     val badges: List<Badge> = emptyList(),
     val events: List<PointEvent> = emptyList(),
     val earned: List<EarnedBadge> = emptyList(),
+    val missions: List<Mission> = emptyList(),
     val createdAt: Long = System.currentTimeMillis(),
 ) {
     /** Punkty do wydania (wszystko: zachowania, nagrody, bonusy, korekty). */

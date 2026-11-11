@@ -6,6 +6,7 @@ import pl.antek.punkty.data.AppData
 import pl.antek.punkty.data.Badge
 import pl.antek.punkty.data.Behavior
 import pl.antek.punkty.data.EarnedBadge
+import pl.antek.punkty.data.Mission
 import pl.antek.punkty.data.PointEvent
 import pl.antek.punkty.data.Reward
 import java.security.SecureRandom
@@ -16,6 +17,7 @@ import java.security.SecureRandom
  * families/{KOD}/config          – JSON: imię, PIN, zachowania, nagrody, odznaki
  * families/{KOD}/events/{id}     – JSON jednego wpisu punktów (dopisywane osobno, więc dwa telefony się nie nadpisują)
  * families/{KOD}/earned/{badge}  – czas zdobycia odznaki
+ * families/{KOD}/missions/{id}   – JSON jednej misji z podpunktami
  */
 @Serializable
 data class SyncConfig(
@@ -36,12 +38,14 @@ object SyncCodec {
     private fun config(d: AppData) = SyncConfig(d.childName, d.pin, d.behaviors, d.rewards, d.badges, d.createdAt)
     fun configJson(d: AppData): String = json.encodeToString(SyncConfig.serializer(), config(d))
     fun eventJson(e: PointEvent): String = json.encodeToString(PointEvent.serializer(), e)
+    fun missionJson(m: Mission): String = json.encodeToString(Mission.serializer(), m)
 
     /** Cały stan – przy zakładaniu rodziny. */
     fun full(d: AppData): Map<String, Any?> = mapOf(
         "config" to configJson(d),
         "events" to d.events.associate { it.id to eventJson(it) },
         "earned" to d.earned.associate { it.badgeId to it.time },
+        "missions" to d.missions.associate { it.id to missionJson(it) },
     )
 
     /** Tylko zmiany (ścieżki względem families/{KOD}); null = usunięcie. */
@@ -58,10 +62,20 @@ object SyncCodec {
         val ae = after.earned.associateBy { it.badgeId }
         for ((id, e) in ae) if (be[id] != e) m["earned/$id"] = e.time
         for (id in be.keys - ae.keys) m["earned/$id"] = null
+
+        val bm = before.missions.associateBy { it.id }
+        val am = after.missions.associateBy { it.id }
+        for ((id, x) in am) if (bm[id] != x) m["missions/$id"] = missionJson(x)
+        for (id in bm.keys - am.keys) m["missions/$id"] = null
         return m
     }
 
-    fun decode(configJson: String?, events: Collection<String>, earned: Map<String, Long>): AppData? {
+    fun decode(
+        configJson: String?,
+        events: Collection<String>,
+        earned: Map<String, Long>,
+        missions: Collection<String> = emptyList(),
+    ): AppData? {
         val c = configJson?.let { runCatching { json.decodeFromString(SyncConfig.serializer(), it) }.getOrNull() }
             ?: return null
         return AppData(
@@ -72,6 +86,7 @@ object SyncCodec {
             badges = c.badges,
             events = events.mapNotNull { runCatching { json.decodeFromString(PointEvent.serializer(), it) }.getOrNull() },
             earned = earned.map { (id, t) -> EarnedBadge(id, t) },
+            missions = missions.mapNotNull { runCatching { json.decodeFromString(Mission.serializer(), it) }.getOrNull() },
             createdAt = c.createdAt,
         ).normalized()
     }
@@ -81,6 +96,7 @@ object SyncCodec {
 fun AppData.normalized(): AppData = copy(
     events = events.sortedWith(compareBy<PointEvent>({ it.time }, { it.id })),
     earned = earned.sortedWith(compareBy<EarnedBadge>({ it.time }, { it.badgeId })),
+    missions = missions.sortedWith(compareBy<Mission>({ it.createdAt }, { it.id })),
 )
 
 object FamilyCode {

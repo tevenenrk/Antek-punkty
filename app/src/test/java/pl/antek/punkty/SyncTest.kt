@@ -37,6 +37,7 @@ class FakeCloud {
             f["config"] as String?,
             f.filterKeys { it.startsWith("events/") }.values.map { it as String },
             f.filterKeys { it.startsWith("earned/") }.mapKeys { it.key.removePrefix("earned/") }.mapValues { it.value as Long },
+            f.filterKeys { it.startsWith("missions/") }.values.map { it as String },
         )
     }
 
@@ -64,6 +65,7 @@ class FakeCloud {
             val flat = mutableMapOf<String, Any?>("config" to SyncCodec.configJson(data))
             data.events.forEach { flat["events/${it.id}"] = SyncCodec.eventJson(it) }
             data.earned.forEach { flat["earned/${it.badgeId}"] = it.time }
+            data.missions.forEach { flat["missions/${it.id}"] = SyncCodec.missionJson(it) }
             write(code, flat)
         }
         override fun fetch(code: String, onResult: (AppData?) -> Unit, onError: (String) -> Unit) = onResult(snapshot(code))
@@ -147,6 +149,40 @@ class SyncTest {
         assertEquals(1, b.data.value.earned.count { it.badgeId == "gx" })
         assertEquals(12, b.data.value.balance)
         assertEquals(12, a.data.value.balance)
+    }
+
+    @Test
+    fun missionCompletesOnceAcrossPhones() {
+        val a = phone("g")
+        val b = phone("h")
+        a.saveMission(
+            pl.antek.punkty.data.Mission(
+                "mx", "Test", steps = listOf(
+                    pl.antek.punkty.data.MissionStep("s1", "jeden"),
+                    pl.antek.punkty.data.MissionStep("s2", "dwa"),
+                ),
+                reward = 20,
+            ),
+        )
+        a.createFamily()
+        b.joinFamily(a.syncState.value.code!!)
+        idle()
+        assertEquals(2, b.data.value.missions.size) // przykładowa + nowa
+        a.toggleStep("mx", "s1")
+        idle()
+        assertEquals(true, b.data.value.missions.first { it.id == "mx" }.steps.first().done)
+        assertNull(b.data.value.missions.first { it.id == "mx" }.completedAt)
+        b.toggleStep("mx", "s2")
+        idle()
+        val ma = a.data.value.missions.first { it.id == "mx" }
+        assertNotNull(ma.completedAt)
+        assertEquals(1, a.data.value.events.count { it.id == "mission-mx" })
+        assertEquals(20, a.data.value.balance)
+        assertEquals(20, b.data.value.balance)
+        // po ukończeniu podpunktów nie da się już odznaczyć
+        a.toggleStep("mx", "s1")
+        assertEquals(true, a.data.value.missions.first { it.id == "mx" }.steps.first().done)
+        assertEquals(20, a.data.value.xp)
     }
 
     @Test

@@ -28,6 +28,7 @@ import pl.antek.punkty.ui.components.PointsPill
 import pl.antek.punkty.ui.screens.BadgesScreen
 import pl.antek.punkty.ui.screens.BehaviorsScreen
 import pl.antek.punkty.ui.screens.HomeScreen
+import pl.antek.punkty.ui.screens.MissionsScreen
 import pl.antek.punkty.ui.screens.MoreScreen
 import pl.antek.punkty.ui.screens.RewardsScreen
 import pl.antek.punkty.ui.theme.Forest
@@ -35,6 +36,7 @@ import pl.antek.punkty.ui.theme.Forest
 enum class AppTab(val label: String, val emoji: String) {
     HOME("Las", "🌳"),
     BEHAVIORS("Zachowania", "⭐"),
+    MISSIONS("Misje", "🎯"),
     REWARDS("Nagrody", "🎁"),
     BADGES("Odznaki", "🏅"),
     MORE("Więcej", "📜"),
@@ -86,7 +88,7 @@ fun ForestApp(vm: AppViewModel = viewModel()) {
                             selected = tab == t,
                             onClick = { tab = t },
                             icon = { Text(t.emoji, fontSize = 22.sp) },
-                            label = { Text(t.label, maxLines = 1, fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                            label = { Text(t.label, maxLines = 1, softWrap = false, fontSize = 10.sp, fontWeight = FontWeight.Bold) },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedTextColor = Forest.Gold,
                                 unselectedTextColor = Color.White.copy(alpha = 0.75f),
@@ -112,6 +114,7 @@ fun ForestApp(vm: AppViewModel = viewModel()) {
                 when (tab) {
                     AppTab.HOME -> HomeScreen(data, onGoToBehaviors = { tab = AppTab.BEHAVIORS })
                     AppTab.BEHAVIORS -> BehaviorsScreen(data, vm, requireParent, onLogged)
+                    AppTab.MISSIONS -> MissionsScreen(data, vm, requireParent)
                     AppTab.REWARDS -> RewardsScreen(data, vm, requireParent)
                     AppTab.BADGES -> BadgesScreen(data, vm, requireParent)
                     AppTab.MORE -> MoreScreen(data, vm, isParent, syncUi, requireParent)

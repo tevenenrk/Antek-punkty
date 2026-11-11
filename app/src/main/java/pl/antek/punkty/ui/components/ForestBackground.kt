@@ -121,7 +121,7 @@ private fun DrawScope.cloud(cx: Float, cy: Float, r: Float) {
     drawCircle(c, r * 0.8f, Offset(cx + r * 1.0f, cy + r * 0.15f))
 }
 
-private fun DrawScope.pine(cx: Float, baseY: Float, height: Float, color: Color) {
+internal fun DrawScope.pine(cx: Float, baseY: Float, height: Float, color: Color) {
     val trunkW = height * 0.08f
     drawRect(
         Color(0xFF5D4037),

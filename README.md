@@ -3,13 +3,14 @@
 Aplikacja na Androida w klimacie bajkowego lasu. Dziecko zbiera punkty (🌰 żołędzie) za dobre zachowanie, wymienia je na nagrody, zdobywa poziomy i odznaki, a za złe zachowanie traci punkty.
 
 <p>
-<img src="screenshots/1_las.png" width="200"> <img src="screenshots/2_zachowania.png" width="200">
+<img src="screenshots/1_las.png" width="200"> <img src="screenshots/2_zachowania.png" width="200"> <img src="screenshots/6_misje.png" width="200">
 <img src="screenshots/3_nagrody.png" width="200"> <img src="screenshots/4_odznaki.png" width="200">
 </p>
 
 ## Co potrafi
 
 - **Zachowania** – dobre i złe, każde z ikonką (zestaw ponad 60 emoji albo własne emoji), punktami i licznikiem serii 🔥. Jedno dotknięcie przyznaje lub odejmuje punkty; pomyłkę można cofnąć z paska na dole ekranu albo z historii.
+- **Misje** – jednorazowe misje z podpunktami do odhaczania (np. „Operacja Czysty Pokój”). Po wykonaniu wszystkich dziecko dostaje punkty. Na górze zakładki Miś Kapral w mundurze moro pokazuje misję na leśnej tablicy.
 - **Nagrody** – Leśny Skarbiec z cenami, paskiem postępu i potwierdzeniem odbioru.
 - **Poziomy** – 12 leśnych poziomów od 🌱 Nasionka do 👑 Króla Lasu. Liczą się zdobyte punkty, więc odbieranie nagród nie cofa poziomu.
 - **Kreator odznak** – cztery rodzaje warunków:

@@ -60,6 +60,15 @@ fun CelebrationDialog(c: Celebration, behaviors: List<Behavior>, onDismiss: () -
             title = "Nowy poziom!"
             text = "Poziom ${c.level.number}\nJesteś teraz: ${c.level.name}"
         }
+        is Celebration.MissionDone -> {
+            icon = c.mission.icon
+            title = "Misja wykonana!"
+            text = buildString {
+                append(c.mission.title)
+                append("\nMiś Kapral salutuje! 🎖️")
+                if (c.mission.reward > 0) append("\n\nNagroda: +${c.mission.reward} ${pointsWord(c.mission.reward)} 🌰")
+            }
+        }
         is Celebration.RewardRedeemed -> {
             icon = c.reward.icon
             title = "Nagroda odebrana!"

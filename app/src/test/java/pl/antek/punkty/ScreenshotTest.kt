@@ -48,7 +48,9 @@ class ScreenshotTest {
         }
         for (d in 0..5) { add("b_teeth", d * day + 1000); add("b_bed", d * day + 2000); add("b_reading", d * day + 3000) }
         add("b_dress", 4000); add("b_homework", 5000); add("n_anger", 6000)
+        val room = base.missions.first()
         val data: AppData = base.copy(
+            missions = listOf(room.copy(steps = room.steps.mapIndexed { idx, st -> st.copy(done = idx < 2) })),
             events = events,
             earned = listOf(EarnedBadge("g_morning", now)),
             createdAt = now - 10 * day,
@@ -73,6 +75,8 @@ class ScreenshotTest {
         shot("1_las")
         rule.onNodeWithText("Zachowania").performClick(); rule.mainClock.advanceTimeBy(1500)
         shot("2_zachowania")
+        rule.onNodeWithText("Misje").performClick(); rule.mainClock.advanceTimeBy(1500)
+        shot("6_misje")
         rule.onNodeWithText("Nagrody").performClick(); rule.mainClock.advanceTimeBy(1500)
         shot("3_nagrody")
         rule.onNodeWithText("Odznaki").performClick(); rule.mainClock.advanceTimeBy(1500)
